@@ -2,7 +2,7 @@
 //
 //****************************************************************************************************
 // Author:
-// 	Nipun Gunawardena
+// 	Some Dude
 //
 // Credits:
 //	Modified from countless TivaWare programs
@@ -15,7 +15,7 @@
 //	Interface Tiva with SD Card
 //
 // Notes:
-//	
+//	Sample Program for MAAV. Functionality described right in front of main
 //
 //****************************************************************************************************
 #define TARGET_IS_TM4C123_RA1
@@ -103,7 +103,46 @@ void fatalError(char errMessage[]){
 
 
 // Main ----------------------------------------------------------------------------------------------
+/*
+ * This Sample Program should do four things:
+ * 	Creates a text file in an sd card or microsd card titled "jason.txt"
+ * 	Writes the message "Sample text for MAAV, controls." onto "jason.txt"
+ * 	Reads up to 400 bytes on "jason.txt" and replaces 'o' with 'X'
+ * 	Writes the edited message onto "jason.txt"
+ *
+ * All platfrom specific code is stuck in "diskio.c"
+ * SD card interfacing is achieved with  the FatFs library.
+ * Documentation can be found at:
+ * 	http://elm-chan.org/fsw/ff/00index_e.html
+ * The documentation is very good, and will help you
+ * understand how to use these functions.
+ * All c files in this project besides
+ * this one and diskio.c are source code for the library.
+ *
+ * 	major functions used are:
+ * 		f_mount - mounts the sd card
+ * 		f_open  - opens file on sd card, with read and/or write capabilities
+ * 		f_read  - reads bytes from designated file
+ * 		f_write - writes bytes to designated file.
+ *
+ * 	pins assigments for this demo can be found in "diskio.c"
+ * 	The important assignments are as follows:
+	  	#define SDC_GPIO_PORT_BASE      GPIO_PORTA_BASE
+		#define SDC_GPIO_SYSCTL_PERIPH  SYSCTL_PERIPH_GPIOA
+		#define SDC_SSI_TX              GPIO_PIN_5
+		#define SDC_SSI_RX              GPIO_PIN_4
+		#define SDC_SSI_FSS             GPIO_PIN_3
+		#define SDC_SSI_CLK             GPIO_PIN_2
 
+	This *should* work out of the box. On Success, an LED will turn green.
+	If an LED turns any other color, there is a failure somewhere.
+	RED - failure to mount
+	YELLOW - failure to read from file
+	BLUE - failure to open file
+	If it does not, check your stack size.
+	This can be done By going to Properties->CCS Build->ARM Linker->Basic Options.
+	The stack size I have set is 2^14, it should work with 2^11 bytes allocated
+ */
 int main(void){
 
 	// Enable lazy stacking
@@ -140,8 +179,7 @@ int main(void){
 			break;
 		case FR_NOT_READY:
 			ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_RED);
-			//fatalError("ERROR: Medium removal or disk_initialize\n");
-			while(1);
+			fatalError("ERROR: Medium removal or disk_initialize\n");
 			break;
 		case FR_NO_FILESYSTEM:
 			fatalError("ERROR: No valid FAT volume on drive\n");
@@ -150,26 +188,25 @@ int main(void){
 			fatalError("ERROR: Something went wrong\n");
 			break;
 	}
-	char in_buff[6000];
+	char in_buff[400];
 	UINT bytes_read;
-	bytes_read = 6000;
-//	char garbo_buf[400];
-//	garbo_buf[0] ='a';
+	bytes_read = 400;
 /*
-if(f_open(&logfile, "jason.txt", FA_WRITE | FA_OPEN_ALWAYS) == FR_OK) {	// Open file - If nonexistent, create
-		f_lseek(&logfile, logfile.fsize);					// Move forward by filesize; logfile.fsize+1 is not needed in this application
-		f_write(&logfile, "Parachutes\n", 11, &bw);				// Append word
-		f_lseek(&logfile,0);
-		UARTprintf("File size is %u\n",logfile.fsize);				// Print size
-		f_close(&logfile);							// Close the file
-		if (bw == 11) {
-			ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_GREEN); // Lights green LED if data written well
+ * Sample Write for initial test
+ */
+	char *sample_text = "Sample text for MAAV, controls.";
+	if(f_open(&logfile, "jason.txt", FA_WRITE | FA_OPEN_ALWAYS) == FR_OK) {
+		f_write(&logfile, (void*) sample_text,strlen(sample_text), &bw);						// Close the file
+		f_close(&logfile);
 		}
+	else {
+		ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_BLUE);
+		while(1);
 	}
-*/
+//reads from "jason.txt"
 if(f_open(&logfile, "jason.txt", FA_READ | FA_OPEN_EXISTING) == FR_OK) {
-//	f_lseek(&logfile, 0);
 	res = f_read(&logfile, in_buff, bytes_read,&bytes_read );
+	// failure conditional - lights LED Yellow
 	if(res) {
 		GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_GREEN|LED_RED);
 		while(1);
@@ -190,59 +227,18 @@ else {
 
 
 if(f_open(&logfile, "jason.txt", FA_WRITE | FA_OPEN_ALWAYS) == FR_OK) {
-//	f_lseek(&logfile, logfile.fsize);
-	//char read_msg[100];
-	//uint16_t rm_len;
-	//rm_len=sprintf (read_msg, "Succesfully read %u bytes", bytes_read);
-	//f_write(&logfile, (void*)read_msg, rm_len, &bw);
-	//rm_len = sprintf(read_msg, "Recreating read message\n");
-	//f_write(&logfile, (void*)read_msg, rm_len, &bw);
 	f_write(&logfile, (void*) in_buff,bytes_read, &bw);						// Close the file
 	f_close(&logfile);
 	}
-	else {
-		ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_BLUE);
-		while(1);
-	}
-/*
-	char *file_N = "jason.txt";
-	char *char_Test = "It works James";
-	char in_buff[200];
-	UINT bytes_read;
+//failure condition - writes LED blue
+else {
+	ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_BLUE);
+	while(1);
+}
 
-	bytes_read = 10;
-	if(f_open(&logfile, "jason.txt", FA_READ|FA_WRITE | FA_OPEN_ALWAYS) == FR_OK) {// Open file - If nonexistent, create
-		f_lseek(&logfile, 0);					// Move forward by filesize; logfile.fsize+1 is not needed in this application
-		//f_write(&logfile, (void*)char_Test, strlen(char_Test), &bw);				// Append word
-		res = f_read(&logfile, in_buff, bytes_read,&bytes_read );
-		if(res)
-			while(1);
-		unsigned int i = 0;
-		while (i < bytes_read) {
-			if(in_buff[i] == 'o')
-				in_buff[i] = 'A';
-			++i;
-		}
-		f_lseek(&logfile, logfile.fsize);
-		char read_msg[100];
-		uint16_t rm_len;
-		rm_len=sprintf (read_msg, "Succesfully read %u bytes", bytes_read);
-		f_write(&logfile, (void*)read_msg, rm_len, &bw);
-		rm_len = sprintf(read_msg, "Recreating read message\n");
-		f_write(&logfile, (void*)read_msg, rm_len, &bw);
-		f_write(&logfile, (void*) in_buff,bytes_read, &bw);						// Close the file
-		if (bw == strlen(char_Test)) {
-			ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_GREEN); // Lights green LED if data written well
-		}
-		f_close(&logfile);
-	}
-	else
-		bw = 7;
-	// Wait Forever
-
-*/
+ // Lights green LED if data written well
 if (bw == bytes_read) {
-	ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_GREEN); // Lights green LED if data written well
+	ROM_GPIOPinWrite(GPIO_PORTF_BASE, LED_RED|LED_GREEN|LED_BLUE, LED_GREEN);
 }
 	while(1);
 	// Wait Forever
